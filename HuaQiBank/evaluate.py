@@ -188,31 +188,22 @@ HIDDEN_DIM = 4  # 这其实是BiLSTM的隐藏层的特征数量，因为是双�
 
 # Make up some training data 每一个句子对应的词性都有正确的标签
 # 1.1 读取文件，修改标签
-with open('data.json', 'r') as obj:
+with open('test.json', 'r') as obj:
     pre_data = json.load(obj)
+
+# test_data = []
+# for sentence_dict in pre_data:
+#     text = {"text": sentence_dict['text']}
+#     test_data.append(text)
+#
+# with open('test.json', 'w') as f:
+#     json.dump(test_data, f)
+
 
 training_data = []
 for sentence_dict in pre_data:
     text = sentence_dict['text'].split()
-    tag = np.repeat('WORD', len(text)).tolist()
-    # 利用标签下标更新新的tag
-    labels = sentence_dict['label']
-    for label in labels:
-        posl = label[1][0]
-        posr = label[1][1]
-        temp_str = sentence_dict['text'][posl:posr].split()
-        if len(temp_str) >1:
-            str_index = text.index(temp_str[0])
-            str_index_r = text.index(temp_str[-1])
-            for i in range(str_index+1, str_index_r+1):
-                text[str_index] = text[str_index] + ' ' + text[i]
-            del text[str_index+1: str_index_r+1]
-            del tag[str_index+1: str_index_r+1]
-        else:
-            str_index = text.index(temp_str[0])
-        tag[str_index] = label[0]
-    data = (text, tag)
-    training_data.append(data)
+    training_data.append(text)
 
 #处理数据集中句子的词，不重复的将句子中的词拿出来并标号
 #设置一个word_to_ix存储句子中每一个单词
@@ -220,44 +211,31 @@ for sentence_dict in pre_data:
 #比如第0次抽出来的就是第一个句子"the wall …money"，与他的标签"B I I …0"。
 #现在只存储出现过的单词(不管标签)
 
-word_to_ix = {}
-for sentence, tags in training_data:
-    for word in sentence:
-        if word not in word_to_ix:
-            #word_to ix没有word这句单词时候，就存储进去
-            #并且给每一个新的word赋值，赋的值就是长度。
-            word_to_ix[word] = len(word_to_ix)
+# 读取词库
+with open('ciku.json', 'r') as obj:
+    word_to_ix = json.load(obj)
 
 #将5个标签存到tag_to_ix的字典中
 tag_to_ix = {"WORD": 0, "NAME": 1, "NOTIONAL": 2, "TICKER": 3, START_TAG: 4, STOP_TAG: 5}
 ix_to_tag = {0: "WORD", 1: "NAME", 2: "NOTIONAL", 3: "TICKER", 4: START_TAG, 5: STOP_TAG}
+
 #将句子输入到BILSTM-CRF模型
 model = BiLSTM_CRF(len(word_to_ix), tag_to_ix, EMBEDDING_DIM, HIDDEN_DIM)
 model.load_state_dict(torch.load('model_parameter.pkl'))
 
-# Check predictions before training
 with torch.no_grad():
-    precheck_sent = prepare_sequence(training_data[0][0], word_to_ix)
-    precheck_tags = torch.tensor([tag_to_ix[t] for t in training_data[0][1]], dtype=torch.long)
+    precheck_sent = prepare_sequence(training_data[0], word_to_ix)
     print(model(precheck_sent))
+# We got it!
 
-for sentence, tags in training_data:
-    # Step 1. Remember that Pytorch accumulates gradients.
-    # We need to clear them out before each instance
-    model.zero_grad()
-
-    # Step 2. Get our inputs ready for the network, that is,
-    # turn them into Tensors of word indices.
+for sentence in training_data:
     sentence_in = prepare_sequence(sentence, word_to_ix)
-    targets = torch.tensor([tag_to_ix[t] for t in tags], dtype=torch.long)
-
-    # Step 3. Run our forward pass.
-    loss = model.neg_log_likelihood(sentence_in, targets)
     result = model(sentence_in)
+
     result = result[1]
     print('=========================================')
     print(sentence)
     for i in range(len(result)):
-        if i >0 and i <4:
-            print(ix_to_tag[i] + ' is : ' + sentence[i])
+        if result[i] >0 and result[i] <4:
+            print(ix_to_tag[result[i]] + ' is : ' + sentence[i])
     print('=========================================')

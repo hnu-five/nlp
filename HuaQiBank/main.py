@@ -204,13 +204,11 @@ for sentence_dict in pre_data:
         if len(temp_str) >1:
             str_index = text.index(temp_str[0])
             str_index_r = text.index(temp_str[-1])
-            for i in range(str_index+1, str_index_r+1):
-                text[str_index] = text[str_index] + ' ' + text[i]
-            del text[str_index+1: str_index_r+1]
-            del tag[str_index+1: str_index_r+1]
+            for i in range(str_index, str_index_r+1):
+                tag[i] = label[0]
         else:
             str_index = text.index(temp_str[0])
-        tag[str_index] = label[0]
+            tag[str_index] = label[0]
     data = (text, tag)
     training_data.append(data)
 
@@ -243,6 +241,10 @@ for sentence, tags in testing_data:
             #并且给每一个新的word赋值，赋的值就是长度。
             word_to_ix[word] = len(word_to_ix)
 
+# 保存词库
+with open('ciku.json', 'w') as f:
+    json.dump(word_to_ix, f)
+
 #将5个标签存到tag_to_ix的字典中
 tag_to_ix = {"WORD": 0, "NAME": 1, "NOTIONAL": 2, "TICKER": 3, START_TAG: 4, STOP_TAG: 5}
 
@@ -258,7 +260,7 @@ with torch.no_grad():
 
 # Make sure prepare_sequence from earlier in the LSTM section is loaded
 for epoch in range(
-        100):  # again, normally you would NOT do 300 epochs, it is toy data
+        10):  # again, normally you would NOT do 300 epochs, it is toy data
     loss_vec = []
     if epoch % 5 == 0:
         for sentence, tags in testing_data:
